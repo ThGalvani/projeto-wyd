@@ -1674,6 +1674,15 @@ struct		 MSG_DBSaveMob
 	bool MobDonateStore;
 };
 
+const short _MSG_DBSaveConfirm				= (8 | FLAG_DB2GAME);
+struct		 MSG_DBSaveConfirm
+{
+	_MSG;
+	int             Slot;
+	char            AccountName[ACCOUNTNAME_LENGTH];
+	bool            Success;
+};
+
 const short _MSG_DBDeleteCharacter			= (9 | FLAG_GAME2DB);
 const short _MSG_DBUpdateSapphire			= (10 | FLAG_GAME2DB);
 

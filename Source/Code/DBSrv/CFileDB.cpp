@@ -821,7 +821,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 		if (IdxName != 0)//
 		{
-			//Log("err, desconectado. conexão anterior finalizada.", m->AccountLogin, 0);
+			//Log("err, desconectado. conexï¿½o anterior finalizada.", m->AccountLogin, 0);
 			//pode att
 			if (m->DBNeedSave == 0)
 			{
@@ -1114,7 +1114,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 			for(int i = 0; i < len; i++)
 			{
-				if(m->MobName[i] == 'í' && m->MobName[i + 1] == 'í')
+				if(m->MobName[i] == 'ï¿½' && m->MobName[i + 1] == 'ï¿½')
 				{
 					SendDBSignal(conn, m->ID, _MSG_DBNewCharacterFail);
 
@@ -1491,6 +1491,29 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 			if(m->Export != 0)
 				DBExportAccount(&pAccountList[Idx].File);
+
+			//==============================================================================
+			// FASE 2 - Envia confirmacao de save para TMSrv
+			// Permite que SaveUserSync() saiba se save foi bem-sucedido
+			//==============================================================================
+			MSG_DBSaveConfirm confirmMsg;
+			memset(&confirmMsg, 0, sizeof(MSG_DBSaveConfirm));
+
+			confirmMsg.Type = _MSG_DBSaveConfirm;
+			confirmMsg.Size = sizeof(MSG_DBSaveConfirm);
+			confirmMsg.ID = m->ID;
+			confirmMsg.Slot = m->Slot;
+			confirmMsg.Success = true;  // DBWriteAccount nao retorna erro, assume sucesso
+			memcpy(confirmMsg.AccountName, m->AccountName, ACCOUNTNAME_LENGTH);
+
+			// Envia confirmacao de volta para TMSrv
+			if (pUser[conn].cSock.Sock && pUser[conn].Mode != USER_EMPTY)
+			{
+				pUser[conn].cSock.SendOneMessage((char*)&confirmMsg, sizeof(MSG_DBSaveConfirm));
+			}
+			//==============================================================================
+			// END FASE 2 - Confirmacao enviada
+			//==============================================================================
 
 		} break;
 
@@ -1878,7 +1901,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 		for (int i = 0; i < len; i++)
 		{
-			if (m->MobName[i] == 'í' && m->MobName[i + 1] == 'í')
+			if (m->MobName[i] == 'ï¿½' && m->MobName[i + 1] == 'ï¿½')
 			{
 				SendDBSignal(conn, m->ID, _MSG_DBNewCharacterFail);
 
@@ -2102,7 +2125,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 		for (int i = 0; i < len; i++)
 		{
-			if (m->MobName[i] == 'í' && m->MobName[i + 1] == 'í')
+			if (m->MobName[i] == 'ï¿½' && m->MobName[i + 1] == 'ï¿½')
 			{
 				SendDBSignal(conn, m->ID, _MSG_DBNewCharacterFail);
 
@@ -2145,7 +2168,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 		mob->Equip[1].sIndex = 3505; // Manda cythera
 
-		mob->BaseScore.Level = 0; // Seta o nível
+		mob->BaseScore.Level = 0; // Seta o nï¿½vel
 
 		mob->BaseScore.Str = BaseSIDCHM[mob->Class][0]; // Seta os atributos dependente da classe.
 		mob->BaseScore.Int = BaseSIDCHM[mob->Class][1];
@@ -2475,7 +2498,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 
 		for (int i = 0; i < len; i++)
 		{
-			if (m->MobName[i] == 'í' && m->MobName[i + 1] == 'í')
+			if (m->MobName[i] == 'ï¿½' && m->MobName[i + 1] == 'ï¿½')
 			{
 				SendDBSignal(conn, m->ID, _MSG_DBNewCharacterFail);
 
@@ -2706,7 +2729,7 @@ int CFileDB::ProcessMessage(char *Msg, int conn)
 		sm2.ID = m->ID;
 		sm2.Size = sizeof(MSG_DBClientMessage);
 
-		strcpy(sm2.String, "Sua conta agora é a primária.");
+		strcpy(sm2.String, "Sua conta agora ï¿½ a primï¿½ria.");
 
 		pUser[conn].cSock.SendOneMessage((char*)&sm2, sizeof(MSG_DBClientMessage));
 	} break;*/

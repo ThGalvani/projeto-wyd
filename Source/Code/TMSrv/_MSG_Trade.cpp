@@ -405,11 +405,46 @@ void Exec_MSG_Trade(int conn, char* pMsg)
 				pMob[conn].MOB.Coin = fGold;
 				pMob[OpponentID].MOB.Coin = opfGold;
 
-				// PASSO 3: TENTA SALVAR AMBOS (operacao critica)
-				// Nota: Como SaveUser e assincrono, vamos marcar para salvar imediatamente
-				// Em producao, isto deveria ser SaveUserSync() que espera confirmacao
-				SaveUser(conn, 1);
-				SaveUser(OpponentID, 1);
+				//==============================================================================
+				// FASE 2 - SaveUserSync com confirmacao e rollback
+				//==============================================================================
+				// PASSO 3: SALVA AMBOS PLAYERS COM CONFIRMACAO (timeout 5s)
+				bool save1_success = SaveUserSync(conn, 5000);
+				bool save2_success = SaveUserSync(OpponentID, 5000);
+
+				if (!save1_success || !save2_success)
+				{
+					// FALHA NO SAVE: ROLLBACK COMPLETO
+					snprintf(temp, sizeof(temp), "Trade SAVE FAILED - ROLLBACK: conn:%d save:%d, opp:%d save:%d",
+						conn, save1_success, OpponentID, save2_success);
+					SystemLog("TRADE-SYSTEM", "00:00:00:00:00:00", 0, temp);
+
+					// Restaura estado original de ambos
+					memcpy(pMob[conn].MOB.Carry, backup_conn_carry, sizeof(backup_conn_carry));
+					memcpy(pMob[OpponentID].MOB.Carry, backup_opp_carry, sizeof(backup_opp_carry));
+					pMob[conn].MOB.Coin = backup_conn_coin;
+					pMob[OpponentID].MOB.Coin = backup_opp_coin;
+
+					// Notifica ambos players
+					SendCarry(conn);
+					SendCarry(OpponentID);
+					SendClientMessage(conn, "Trade failed: database error. Items restored.");
+					SendClientMessage(OpponentID, "Trade failed: database error. Items restored.");
+
+					// Cancela trade
+					RemoveTrade(conn);
+					RemoveTrade(OpponentID);
+
+					return;
+				}
+
+				// SUCESSO: Save confirmado pelo DBSrv
+				snprintf(temp, sizeof(temp), "Trade SAVE CONFIRMED by DBSrv: [%s] and [%s]",
+					pUser[conn].AccountName, pUser[OpponentID].AccountName);
+				SystemLog("TRADE-SYSTEM", "00:00:00:00:00:00", 0, temp);
+				//==============================================================================
+				// END FASE 2 - Save agora e confirmado antes de commit
+				//==============================================================================
 
 				// PASSO 4: Atualiza clientes
 				SendCarry(conn);
@@ -429,12 +464,6 @@ void Exec_MSG_Trade(int conn, char* pMsg)
 				RemoveTrade(conn);
 				RemoveTrade(OpponentID);
 
-				//==============================================================================
-				// END FASE 1 - Trade agora e atomico com locks e backup
-				//
-				// TODO FASE 2: Implementar SaveUserSync() com confirmacao real
-				// Para garantir que salvamento aconteceu antes de commitar
-				//==============================================================================
 				return;
 			}
 

@@ -427,6 +427,103 @@ namespace SecurityLocks {
 }
 //==============================================================================
 
+//==============================================================================
+// FASE 2 - SaveUserSync Globals
+//==============================================================================
+namespace SaveConfirmation {
+	std::map<int, PendingSaveConfirmation> g_PendingSaves;
+	std::mutex g_PendingSavesMutex;
+}
+
+//==============================================================================
+// FASE 2 - SaveUserSync Implementation
+// Funcao sincrona de save que espera confirmacao do DBSrv
+//
+// PROBLEMA: SaveUser() atual e assincrono - nao espera confirmacao
+// SOLUCAO: SaveUserSync() envia MSG_DBSaveMob e espera MSG_DBSaveConfirm
+//
+// PARAMETROS:
+//   conn        - ID da conexao do player
+//   timeout_ms  - Timeout em milissegundos (padrao: 5000ms = 5s)
+//
+// RETORNO:
+//   true  - Save confirmado com sucesso pelo DBSrv
+//   false - Timeout ou falha no save
+//==============================================================================
+bool SaveUserSync(int conn, int timeout_ms)
+{
+	if (conn < 0 || conn >= MAX_USER)
+		return false;
+
+	if (pUser[conn].Mode != USER_PLAY)
+		return false;
+
+	// PASSO 1: Registra pendencia de confirmacao
+	{
+		std::lock_guard<std::mutex> lock(SaveConfirmation::g_PendingSavesMutex);
+
+		PendingSaveConfirmation pending;
+		pending.conn = conn;
+		pending.slot = pUser[conn].Slot;
+		strncpy_s(pending.accountName, pUser[conn].AccountName, ACCOUNTNAME_LENGTH);
+		pending.confirmed = false;
+		pending.success = false;
+		pending.timestamp = std::chrono::steady_clock::now();
+
+		SaveConfirmation::g_PendingSaves[conn] = pending;
+	}
+
+	// PASSO 2: Chama SaveUser() normal (envia MSG_DBSaveMob)
+	SaveUser(conn, 1);
+
+	// PASSO 3: Espera confirmacao com timeout
+	auto& pending = SaveConfirmation::g_PendingSaves[conn];
+	std::unique_lock<std::mutex> lock(pending.mutex);
+
+	bool confirmed = pending.cv.wait_for(
+		lock,
+		std::chrono::milliseconds(timeout_ms),
+		[&]() { return pending.confirmed; }
+	);
+
+	// PASSO 4: Processa resultado
+	bool success = false;
+
+	if (confirmed && pending.success)
+	{
+		// Sucesso - confirmacao recebida
+		sprintf_s(temp, "SaveUserSync SUCCESS for conn:%d account:%s",
+			conn, pUser[conn].AccountName);
+		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
+		success = true;
+	}
+	else if (!confirmed)
+	{
+		// Timeout - DBSrv nao respondeu
+		sprintf_s(temp, "SaveUserSync TIMEOUT for conn:%d account:%s (timeout:%dms)",
+			conn, pUser[conn].AccountName, timeout_ms);
+		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
+	}
+	else
+	{
+		// Confirmacao recebida mas save falhou
+		sprintf_s(temp, "SaveUserSync FAILED for conn:%d account:%s",
+			conn, pUser[conn].AccountName);
+		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
+	}
+
+	// PASSO 5: Remove da lista de pendencias
+	{
+		std::lock_guard<std::mutex> lock_pending(SaveConfirmation::g_PendingSavesMutex);
+		SaveConfirmation::g_PendingSaves.erase(conn);
+	}
+
+	return success;
+}
+//==============================================================================
+// END FASE 2 - SaveUserSync
+//==============================================================================
+
 STRUCT_TREASURE g_pTreasure[8];
 
 STRUCT_ITEM LevelItem[4][4][400];

@@ -850,7 +850,7 @@ void ProcessDBMessage(char* Msg)
 
 			if (Limitadordeconexoes(pUser[conn].MacAddress) >= 10)
 			{
-				CloseUser(conn);//força a saida da conn
+				CloseUser(conn);//forï¿½a a saida da conn
 				break;
 			}
 
@@ -1072,7 +1072,7 @@ void ProcessDBMessage(char* Msg)
 			}
 
 			if (KefraLive == 0) {
-				SendMsgExp(conn, "Kefra está Vivo!", Orange, FALSE);
+				SendMsgExp(conn, "Kefra estï¿½ Vivo!", Orange, FALSE);
 			}*/
 
 			/*if (RvRBonus == pMob[conn].MOB.Clan && RvRBonus)
@@ -1100,7 +1100,7 @@ void ProcessDBMessage(char* Msg)
 
 			//bool Reboot = false;
 			//for (int i = 0; i < 16; i++) {
-			//	if (pMob[conn].MOB.Equip[i].sIndex == 632 || pMob[conn].MOB.Equip[i].sIndex == 671 || pMob[conn].MOB.Equip[i].sIndex == 670) // ABS - ESPECTRAL - CONCENTRAÇÃO
+			//	if (pMob[conn].MOB.Equip[i].sIndex == 632 || pMob[conn].MOB.Equip[i].sIndex == 671 || pMob[conn].MOB.Equip[i].sIndex == 670) // ABS - ESPECTRAL - CONCENTRAï¿½ï¿½O
 			//	{
 
 			//		memset(&pMob[conn].MOB.Equip[i], 0x0, sizeof(STRUCT_ITEM));
@@ -1111,7 +1111,7 @@ void ProcessDBMessage(char* Msg)
 			//}
 
 			//for (int i = 0; i < 64; i++) {
-			//	if (pMob[conn].MOB.Carry[i].sIndex == 632 || pMob[conn].MOB.Carry[i].sIndex == 671 || pMob[conn].MOB.Carry[i].sIndex == 670) // ABS - ESPECTRAL - CONCENTRAÇÃO
+			//	if (pMob[conn].MOB.Carry[i].sIndex == 632 || pMob[conn].MOB.Carry[i].sIndex == 671 || pMob[conn].MOB.Carry[i].sIndex == 670) // ABS - ESPECTRAL - CONCENTRAï¿½ï¿½O
 			//	{
 
 			//		memset(&pMob[conn].MOB.Carry[i], 0x0, sizeof(STRUCT_ITEM));
@@ -1121,7 +1121,7 @@ void ProcessDBMessage(char* Msg)
 			//	}
 			//}
 			//for (int i = 0; i < 128; i++) {
-			//	if (pUser[conn].Cargo[i].sIndex == 632 || pUser[conn].Cargo[i].sIndex == 671 || pUser[conn].Cargo[i].sIndex == 670) // ABS - ESPECTRAL - CONCENTRAÇÃO
+			//	if (pUser[conn].Cargo[i].sIndex == 632 || pUser[conn].Cargo[i].sIndex == 671 || pUser[conn].Cargo[i].sIndex == 670) // ABS - ESPECTRAL - CONCENTRAï¿½ï¿½O
 			//	{
 
 			//		memset(&pUser[conn].Cargo[i], 0x0, sizeof(STRUCT_ITEM));
@@ -1216,6 +1216,53 @@ void ProcessDBMessage(char* Msg)
 
 			CloseUser(conn);
 
+		} break;
+#pragma endregion
+#pragma region _MSG_DBSaveConfirm
+		case _MSG_DBSaveConfirm:
+		{
+			//==============================================================================
+			// FASE 2 - Handler para MSG_DBSaveConfirm
+			// Recebe confirmacao do DBSrv de que save foi bem-sucedido
+			//==============================================================================
+			MSG_DBSaveConfirm* m = (MSG_DBSaveConfirm*)Msg;
+
+			if (m->ID <= 0 || m->ID >= MAX_USER)
+			{
+				SystemLog("-system", "-", 0, "err,DBSaveConfirm - id range");
+				break;
+			}
+
+			int conn_id = m->ID;
+
+			// Procura pendencia de confirmacao
+			std::lock_guard<std::mutex> lock(SaveConfirmation::g_PendingSavesMutex);
+
+			auto it = SaveConfirmation::g_PendingSaves.find(conn_id);
+			if (it != SaveConfirmation::g_PendingSaves.end())
+			{
+				// ENCONTROU: Notifica a thread que esta esperando
+				PendingSaveConfirmation& pending = it->second;
+
+				std::unique_lock<std::mutex> pending_lock(pending.mutex);
+				pending.confirmed = true;
+				pending.success = m->Success;
+				pending_lock.unlock();
+
+				// Acorda a thread esperando em SaveUserSync()
+				pending.cv.notify_one();
+
+				sprintf_s(temp, "DBSaveConfirm received: conn:%d slot:%d success:%d",
+					conn_id, m->Slot, m->Success);
+				SystemLog(m->AccountName, "-", 0, temp);
+			}
+			else
+			{
+				// Confirmacao recebida mas nao havia pendencia (save assincrono normal)
+				sprintf_s(temp, "DBSaveConfirm received but no pending save: conn:%d slot:%d",
+					conn_id, m->Slot);
+				SystemLog(m->AccountName, "-", 0, temp);
+			}
 		} break;
 #pragma endregion
 #pragma region _MSG_DBSavingQuit

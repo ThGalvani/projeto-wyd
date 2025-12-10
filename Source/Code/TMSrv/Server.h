@@ -84,6 +84,39 @@ public:
 // END FASE 1
 //==============================================================================
 
+//==============================================================================
+// FASE 2 - SaveUserSync Confirmation Protocol
+//==============================================================================
+
+#include <map>
+#include <chrono>
+#include <condition_variable>
+
+// Estrutura para rastrear confirmacoes pendentes de SaveUser
+struct PendingSaveConfirmation {
+    int conn;
+    int slot;
+    char accountName[ACCOUNTNAME_LENGTH];
+    bool confirmed;
+    bool success;
+    std::chrono::steady_clock::time_point timestamp;
+    std::mutex mutex;
+    std::condition_variable cv;
+};
+
+// Mapa global de confirmacoes pendentes (key = conn)
+namespace SaveConfirmation {
+    extern std::map<int, PendingSaveConfirmation> g_PendingSaves;
+    extern std::mutex g_PendingSavesMutex;
+}
+
+// Funcao sincrona de save com confirmacao (timeout em ms)
+bool SaveUserSync(int conn, int timeout_ms = 5000);
+
+//==============================================================================
+// END FASE 2
+//==============================================================================
+
 // Externs
 extern HWND hWndMain;
 extern bool g_BSombraNegra;

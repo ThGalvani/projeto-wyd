@@ -8,6 +8,12 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 
 	int Size = m->Size;
 
+	//==============================================================================
+	// FASE 2 - Adiciona lock do player no inicio da operacao
+	// Previne race conditions em operacoes de swap/trade de itens
+	//==============================================================================
+	PlayerLockGuard playerLock(conn);
+
 	if (m->WarpID < 0 || m->WarpID >= MAX_MOB)
 		return;
 
@@ -23,16 +29,16 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 	if (m->DestPlace < 0)
 		return;
 
-	// correção de dup
+	// correï¿½ï¿½o de dup
 	if (m->SrcPlace == m->DestPlace && m->SrcSlot == m->DestSlot) {
 		CloseUser(conn);
-		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, "Dup bug");
+		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, "Dup bug - same src/dest");
 		return;
 	}
 
 	if (Size > sizeof(MSG_TradingItem)) //CONTROLE DE SIZE
 	{
-		SendClientMessage(conn, "Impossível executar ação52, tente mais tarde. ");
+		SendClientMessage(conn, "Impossï¿½vel executar aï¿½ï¿½o52, tente mais tarde. ");
 		return;
 	}
 
@@ -58,7 +64,7 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 
 	if(m->SrcPlace == ITEM_PLACE_CARGO && m->DestPlace == ITEM_PLACE_EQUIP)
 	{
-		SendClientMessage(conn, "Passe o item para o inventário antes de equipá-lo.");
+		SendClientMessage(conn, "Passe o item para o inventï¿½rio antes de equipï¿½-lo.");
 		return;
 	}
 
@@ -157,7 +163,7 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 				NearCargo = true;
 			}
 			if (NearCargo == false) {
-				SendClientMessage(conn, "Você está longe do Bau");
+				SendClientMessage(conn, "Vocï¿½ estï¿½ longe do Bau");
 				return;
 			}
 		}
@@ -209,7 +215,7 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 				NearCargo = true;
 			}
 			if (NearCargo == false) {
-				SendClientMessage(conn, "Você está longe do Bau");
+				SendClientMessage(conn, "Vocï¿½ estï¿½ longe do Bau");
 				return;
 			}
 		}
@@ -326,25 +332,24 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 			}
 			if (Can && YouCan)
 			{
-
+				//==============================================================================
+				// FASE 2 - Backup COMPLETO dos itens (nao apenas campos selecionados)
+				// Permite rollback completo em caso de falha
+				//==============================================================================
 				STRUCT_ITEM save1;
 				STRUCT_ITEM save2;
 
-				save1.sIndex = SrcItem->sIndex;
-				save1.stEffect[0].cEffect = SrcItem->stEffect[0].cEffect;
-				save1.stEffect[0].cValue = SrcItem->stEffect[0].cValue;
-				save1.stEffect[1].cEffect = SrcItem->stEffect[1].cEffect;
-				save1.stEffect[1].cValue = SrcItem->stEffect[1].cValue;
-				save1.stEffect[2].cEffect = SrcItem->stEffect[2].cEffect;
-				save1.stEffect[2].cValue = SrcItem->stEffect[2].cValue;
+				// Backup completo com memcpy (mais seguro que copiar campo por campo)
+				memcpy(&save1, SrcItem, sizeof(STRUCT_ITEM));
+				memcpy(&save2, DestItem, sizeof(STRUCT_ITEM));
 
-				save2.sIndex = DestItem->sIndex;
-				save2.stEffect[0].cEffect = DestItem->stEffect[0].cEffect;
-				save2.stEffect[0].cValue = DestItem->stEffect[0].cValue;
-				save2.stEffect[1].cEffect = DestItem->stEffect[1].cEffect;
-				save2.stEffect[1].cValue = DestItem->stEffect[1].cValue;
-				save2.stEffect[2].cEffect = DestItem->stEffect[2].cEffect;
-				save2.stEffect[2].cValue = DestItem->stEffect[2].cValue;
+				// Log detalhado da operacao
+				char logBuf[512];
+				snprintf(logBuf, sizeof(logBuf),
+					"TradingItem: conn:%d SrcPlace:%d SrcSlot:%d (idx:%d) -> DestPlace:%d DestSlot:%d (idx:%d)",
+					conn, m->SrcPlace, m->SrcSlot, save1.sIndex, m->DestPlace, m->DestSlot, save2.sIndex);
+				SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, logBuf);
+				//==============================================================================
 
 				//AGRUPAR ITENS MANUALMENTE
 				if ((save1.sIndex == save2.sIndex && save1.sIndex == 413
@@ -536,7 +541,7 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 					SendItem(conn, m->DestPlace, m->DestSlot, &save2);
 				}				
 
-				//VERIFICAÇAO DE DATA
+				//VERIFICAï¿½AO DE DATA
 				if (save1.sIndex >= 3980 && save1.sIndex <= 3992 && BASE_CheckItemDate(&save1) || save1.sIndex >= 4150 && save1.sIndex <= 4188 && BASE_CheckItemDate(&save1))
 				{
 					BASE_ClearItem(&save1);
@@ -708,27 +713,27 @@ void Exec_MSG_TradingItem(int conn, char *pMsg)
 			}
 			else
 			{
+				//==============================================================================
+				// FASE 2 - Backup completo tambem no else branch
+				//==============================================================================
 				STRUCT_ITEM save1;
 				STRUCT_ITEM save2;
 
-				save1.sIndex = SrcItem->sIndex;
-				save1.stEffect[0].cEffect = SrcItem->stEffect[0].cEffect;
-				save1.stEffect[0].cValue = SrcItem->stEffect[0].cValue;
-				save1.stEffect[1].cEffect = SrcItem->stEffect[1].cEffect;
-				save1.stEffect[1].cValue = SrcItem->stEffect[1].cValue;
-				save1.stEffect[2].cEffect = SrcItem->stEffect[2].cEffect;
-				save1.stEffect[2].cValue = SrcItem->stEffect[2].cValue;
+				// Backup completo
+				memcpy(&save1, SrcItem, sizeof(STRUCT_ITEM));
+				memcpy(&save2, DestItem, sizeof(STRUCT_ITEM));
 
-				save2.sIndex = DestItem->sIndex;
-				save2.stEffect[0].cEffect = DestItem->stEffect[0].cEffect;
-				save2.stEffect[0].cValue = DestItem->stEffect[0].cValue;
-				save2.stEffect[1].cEffect = DestItem->stEffect[1].cEffect;
-				save2.stEffect[1].cValue = DestItem->stEffect[1].cValue;
-				save2.stEffect[2].cEffect = DestItem->stEffect[2].cEffect;
-				save2.stEffect[2].cValue = DestItem->stEffect[2].cValue;
-
+				// Restaura itens originais (sem modificacao - falha em CanEquip)
 				memcpy(SrcItem, &save1, sizeof(STRUCT_ITEM));
 				memcpy(DestItem, &save2, sizeof(STRUCT_ITEM));
+
+				// Log de falha
+				char logBuf[256];
+				snprintf(logBuf, sizeof(logBuf),
+					"TradingItem FAILED - CanEquip validation: conn:%d",
+					conn);
+				SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, logBuf);
+				//==============================================================================
 			}
 		}
 	}
