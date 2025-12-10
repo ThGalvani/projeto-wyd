@@ -415,7 +415,18 @@ CNPCSummon mSummon;
 CUser pUser[MAX_USER];
 CMob pMob[MAX_MOB];
 STRUCT_BLOCKMAC pMac[MAX_MAC];
- 
+
+//==============================================================================
+// FASE 1 EMERGENCIA - Sistema de Sincronizacao
+// Definicao dos mutexes globais para prevenir race conditions
+//==============================================================================
+namespace SecurityLocks {
+	std::mutex g_PlayerLocks[MAX_USER];
+	std::mutex g_ItemGridLock;
+	std::mutex g_TradeLock;
+}
+//==============================================================================
+
 STRUCT_TREASURE g_pTreasure[8];
 
 STRUCT_ITEM LevelItem[4][4][400];

@@ -46,6 +46,44 @@
 
 #include <locale.h>
 
+//==============================================================================
+// FASE 1 EMERGENCIA - Sistema de Sincronizacao
+// Adiciona locks para prevenir race conditions em operacoes criticas
+//==============================================================================
+#include <mutex>
+#include <map>
+
+// Sistema de locks por player para operacoes atomicas
+namespace SecurityLocks {
+	extern std::mutex g_PlayerLocks[MAX_USER];
+	extern std::mutex g_ItemGridLock;
+	extern std::mutex g_TradeLock;
+}
+
+// Helper para RAII lock (auto-unlock no destrutor)
+class PlayerLockGuard {
+private:
+	std::mutex* m_lock;
+	bool m_locked;
+public:
+	PlayerLockGuard(int conn) : m_lock(nullptr), m_locked(false) {
+		if (conn >= 0 && conn < MAX_USER) {
+			m_lock = &SecurityLocks::g_PlayerLocks[conn];
+			m_lock->lock();
+			m_locked = true;
+		}
+	}
+	~PlayerLockGuard() {
+		if (m_locked && m_lock) {
+			m_lock->unlock();
+		}
+	}
+};
+
+//==============================================================================
+// END FASE 1
+//==============================================================================
+
 // Externs
 extern HWND hWndMain;
 extern bool g_BSombraNegra;

@@ -41,7 +41,7 @@ void Exec_MSG_GetItem(int conn, char *pMsg)
 
 	if (Size > sizeof(MSG_GetItem)) //CONTROLE DE SIZE
 	{
-		SendClientMessage(conn, "Impossível executar ação28, tente mais tarde. ");
+		SendClientMessage(conn, "Impossï¿½vel executar aï¿½ï¿½o28, tente mais tarde. ");
 		return;
 	}
 
@@ -203,10 +203,30 @@ void Exec_MSG_GetItem(int conn, char *pMsg)
 		return;
 	}
 
+	//==============================================================================
+	// FASE 1 EMERGENCIA - FIX VULNERABILIDADE CRITICA #2
+	// Correcao de race condition em GetItem
+	//
+	// PROBLEMA ORIGINAL:
+	// - Item era copiado para inventario ANTES de ser limpo do chao
+	// - Multiplos players podiam pegar o mesmo item (spam racing)
+	//
+	// SOLUCAO:
+	// 1. Lock atomico do player E do grid
+	// 2. ATOMIC CHECK-AND-CLEAR do grid (checa e limpa em operacao atomica)
+	// 3. Tenta copiar para inventario
+	// 4. Se falhar, ROLLBACK (restaura item no chao)
+	//==============================================================================
+
+	// Lock do player E do grid para operacao atomica
+	PlayerLockGuard playerLock(conn);
+	std::lock_guard<std::mutex> gridLock(SecurityLocks::g_ItemGridLock);
+
+	// ATOMIC CHECK: Valida que item ainda esta no grid
 	if (pItemGrid[itemY][itemX] != itemID)
 	{
+		// Item ja foi pego por outro player
 		int Size = sm_deci.Size;
-
 		if (Size > sizeof(MSG_DecayItem))
 		{
 			sm_deci.Size = 0;
@@ -214,17 +234,13 @@ void Exec_MSG_GetItem(int conn, char *pMsg)
 		}
 		if (!pUser[conn].cSock.AddMessage((char*)&sm_deci, sizeof(MSG_DecayItem)))
 			CloseUser(conn);
-
-		if (!pItemGrid[itemY][itemX])
-			pItemGrid[itemY][itemX] = itemID;
-
 		return;
 	}
 
 	if (itemX != m->GridX || itemY != m->GridY)
 	{
+		// Coordenadas nao conferem
 		int Size = sm_deci.Size;
-
 		if (Size > sizeof(MSG_DecayItem))
 		{
 			sm_deci.Size = 0;
@@ -235,53 +251,65 @@ void Exec_MSG_GetItem(int conn, char *pMsg)
 		return;
 	}
 
+	// PASSO 1: LIMPA IMEDIATAMENTE (operacao atomica - previne race)
+	pItemGrid[itemY][itemX] = 0;
+	pItem[itemID].Mode = 0;
+
+	// PASSO 2: Backup do item para possivel rollback
+	STRUCT_ITEM itemBackup;
+	memcpy(&itemBackup, ditem, sizeof(STRUCT_ITEM));
+
+	// PASSO 3: Processar item (gold ou item normal)
 	int Vol = BASE_GetItemAbility(ditem, EF_VOLATILE);
 
 	if (Vol == 2)
 	{
+		// Item e gold/moeda
 		int HWORDCOIN = BASE_GetItemAbility((STRUCT_ITEM*)ditem, EF_HWORDCOIN);
 		int coin1 = HWORDCOIN << 8;
-
 		HWORDCOIN = BASE_GetItemAbility((STRUCT_ITEM*)ditem, EF_LWORDCOIN);
-
 		coin1 += HWORDCOIN;
+
 		int tcoin = coin1 + pMob[conn].MOB.Coin;
 
 		if (tcoin >= 2000000000)
 		{
+			// Overflow de gold - ROLLBACK
+			pItemGrid[itemY][itemX] = itemID;
+			pItem[itemID].Mode = 1;
+
 			SendClientMessage(conn, g_pMessageStringTable[273]);
 			return;
 		}
+
 		pMob[conn].MOB.Coin += coin1;
-
-		int Size = sm_deci.Size;
-
-		if (Size > sizeof(MSG_DecayItem))
-		{
-			sm_deci.Size = 0;
-			return;
-		}
-		if (!pUser[conn].cSock.AddMessage((char*)&sm_deci, sizeof(MSG_DecayItem)))
-			CloseUser(conn);
-
 		BASE_ClearItem(ditem);
-	}
 
+		char itemLog[2048];
+		sprintf_s(itemLog, "getitem (GOLD), amount:%d", coin1);
+		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, itemLog);
+	}
 	else
 	{
+		// Item normal - tenta adicionar ao inventario
 		if (m->DestPos < 0 || m->DestPos >= MAX_CARRY)
 		{
-			//Log("DEBUG:Trading Fails.(Wrong source position)", pUser[conn].AccountName, pUser[conn].IP);
+			// Posicao invalida - ROLLBACK
+			pItemGrid[itemY][itemX] = itemID;
+			pItem[itemID].Mode = 1;
+			memcpy(ditem, &itemBackup, sizeof(STRUCT_ITEM));
 			return;
 		}
 
 		STRUCT_ITEM* bItem = &pMob[conn].MOB.Carry[m->DestPos];
 
-		int error = -2;
-		int can = bItem->sIndex == 0 ? 1 : 0;
-
-		if (can == 0)
+		if (bItem->sIndex != 0)
 		{
+			// Slot ja ocupado - ROLLBACK
+			pItemGrid[itemY][itemX] = itemID;
+			pItem[itemID].Mode = 1;
+			memcpy(ditem, &itemBackup, sizeof(STRUCT_ITEM));
+
 			if (m->DestPos > 0 && m->DestPos <= pMob[conn].MaxCarry)
 			{
 				m->DestPos--;
@@ -289,6 +317,8 @@ void Exec_MSG_GetItem(int conn, char *pMsg)
 			}
 			return;
 		}
+
+		// SUCESSO: Copia para inventario
 		memcpy(bItem, ditem, sizeof(STRUCT_ITEM));
 
 		char itemLog[2048];
@@ -296,31 +326,26 @@ void Exec_MSG_GetItem(int conn, char *pMsg)
 		sprintf_s(temp, "getitem, %s", itemLog);
 		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
 
+		SendItem(conn, ITEM_PLACE_CARRY, m->DestPos, bItem);
 	}
 
+	// PASSO 4: Confirma remocao do item do chao para todos os players
+	GridMulticast(itemX, itemY, (MSG_STANDARD*)&sm_deci, 0);
+
+	// PASSO 5: Confirma para o cliente
 	MSG_CNFGetItem cnfGet;
 	memset(&cnfGet, 0, sizeof(MSG_CNFGetItem));
 
 	cnfGet.Type = _MSG_CNFGetItem;
 	cnfGet.Size = sizeof(MSG_CNFGetItem);
 	cnfGet.ID = ESCENE_FIELD;
-
 	cnfGet.DestPos = m->DestPos;
 	cnfGet.DestType = m->DestType;
-
-	if (Size > sizeof(MSG_CNFGetItem))
-	{
-		m->Size = 0;
-		return;
-	}
 
 	if (!pUser[conn].cSock.AddMessage((char*)&cnfGet, sizeof(MSG_CNFGetItem)))
 		CloseUser(conn);
 
-	GridMulticast(itemX, itemY, (MSG_STANDARD*)&sm_deci, 0);
-
-	pItemGrid[itemY][itemX] = 0;
-	pItem[itemID].Mode = 0;
-
-	SendItem(conn, ITEM_PLACE_CARRY, m->DestPos, &pMob[conn].MOB.Carry[m->DestPos]);
+	//==============================================================================
+	// END FASE 1 - GetItem agora e atomico e seguro contra dupes por racing
+	//==============================================================================
 }

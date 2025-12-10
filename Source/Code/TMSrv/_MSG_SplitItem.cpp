@@ -26,7 +26,7 @@ void Exec_MSG_SplitItem(int conn, char* pMsg)
 
 	if (Size > sizeof(MSG_SplitItem)) //CONTROLE DE SIZE
 	{
-		SendClientMessage(conn, "Impossível executar ação50, tente mais tarde. ");
+		SendClientMessage(conn, "Impossï¿½vel executar aï¿½ï¿½o50, tente mais tarde. ");
 		return;
 	}
 	if (pUser[conn].Atraso != 0)
@@ -119,25 +119,51 @@ void Exec_MSG_SplitItem(int conn, char* pMsg)
 	if (amount == 0 || amount == 1 || amount <= m->Num)
 		return;
 
-	
-	snprintf(temp, sizeof(temp), "splititem, itemindex:%d amount:%d num:%d", pMob[conn].MOB.Carry[slot].sIndex, amount, m->Num);
+	//==============================================================================
+	// FASE 1 EMERGENCIA - FIX VULNERABILIDADE #5
+	// Adiciona validacao de PutItem ANTES de modificar item original
+	//
+	// PROBLEMA ORIGINAL:
+	// - Reduzia quantidade do item ANTES de validar se PutItem tinha sucesso
+	// - Se PutItem falhasse, itens eram perdidos
+	//
+	// SOLUCAO:
+	// 1. Lock do player
+	// 2. Cria novo item
+	// 3. VALIDA PutItem PRIMEIRO
+	// 4. Se sucesso, AI SIM reduz quantidade original
+	//==============================================================================
+
+	PlayerLockGuard lock(conn);
+
+	snprintf(temp, sizeof(temp), "splititem, itemindex:%d amount:%d num:%d",
+		pMob[conn].MOB.Carry[slot].sIndex, amount, m->Num);
 	ItemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
 
+	// PASSO 1: Cria novo item
+	STRUCT_ITEM nItem;
+	memset(&nItem, 0, sizeof(STRUCT_ITEM));
+	nItem.sIndex = pMob[conn].MOB.Carry[slot].sIndex;
+	BASE_SetItemAmount(&nItem, m->Num);
+
+	// PASSO 2: VALIDA se PutItem tem sucesso ANTES de modificar original
+	if (!PutItem(conn, &nItem))
+	{
+		// FALHOU: nao modifica item original
+		SendClientMessage(conn, "Erro ao dividir item. Inventario cheio?");
+		return;
+	}
+
+	// PASSO 3: SUCESSO - Agora sim, reduz quantidade do item original
 	if (amount > 1)
 		BASE_SetItemAmount(&pMob[conn].MOB.Carry[slot], amount - m->Num);
-
 	else
 		memset(&pMob[conn].MOB.Carry[slot], 0, sizeof(STRUCT_ITEM));
 
-	STRUCT_ITEM nItem;
-
-	memset(&nItem, 0, sizeof(STRUCT_ITEM));
-
-	nItem.sIndex = pMob[conn].MOB.Carry[slot].sIndex;
-
-	BASE_SetItemAmount(&nItem, m->Num);
-
-	PutItem(conn, &nItem);
 	SendItem(conn, ITEM_PLACE_CARRY, slot, &pMob[conn].MOB.Carry[slot]);
+
+	//==============================================================================
+	// END FASE 1 - SplitItem agora valida sucesso antes de modificar
+	//==============================================================================
 	return;
 }

@@ -42,7 +42,7 @@ void Exec_MSG_DropItem(int conn, char *pMsg)
 
 	if (Size > sizeof(MSG_DropItem)) //CONTROLE DE SIZE
 	{
-		SendClientMessage(conn, "Impossível executar ação27, tente mais tarde. ");
+		SendClientMessage(conn, "Impossï¿½vel executar aï¿½ï¿½o27, tente mais tarde. ");
 		return;
 	}
 
@@ -121,51 +121,89 @@ void Exec_MSG_DropItem(int conn, char *pMsg)
 		}
 	}
 
+	//==============================================================================
+	// FASE 1 EMERGENCIA - FIX VULNERABILIDADE CRITICA #1
+	// Correcao de race condition em DropItem
+	//
+	// PROBLEMA ORIGINAL:
+	// - Item era criado no chao ANTES de ser removido do inventario
+	// - Janela de vulnerabilidade permitia disconnect timing dupe
+	//
+	// SOLUCAO:
+	// 1. Lock do player (previne operacoes concorrentes)
+	// 2. Backup completo do item (nao apenas ponteiro)
+	// 3. REMOVE do inventario PRIMEIRO
+	// 4. Tenta criar no chao
+	// 5. Se falhar, ROLLBACK (restaura do backup)
+	//==============================================================================
+
+	// Lock do player para operacao atomica
+	PlayerLockGuard lock(conn);
+
 	STRUCT_ITEM* SrcItem = GetItemPointer(&pMob[conn].MOB, pUser[conn].Cargo, m->SourType, m->SourPos);
-	STRUCT_ITEM* BackupItem = GetItemPointer(&pMob[conn].MOB, pUser[conn].Cargo, m->SourType, m->SourPos);
 
-
-	if (SrcItem == NULL || BackupItem == NULL)
+	if (SrcItem == NULL)
 		return;
 
 	if (SrcItem->sIndex <= 0 || SrcItem->sIndex >= MAX_ITEMLIST)
 		return;
 
-	if (SrcItem->sIndex != 508 && SrcItem->sIndex != 509 && SrcItem->sIndex != 522
-		&& (SrcItem->sIndex < 526 || SrcItem->sIndex > 537) && SrcItem->sIndex != 446 && SrcItem->sIndex != 747 && SrcItem->sIndex != 3993 && SrcItem->sIndex != 3994)
-	{
-		int drop = CreateItem(m->GridX, m->GridY, SrcItem, m->Rotate, 1);
-
-		if (drop <= 0 || drop >= MAX_ITEM)
-		{
-			SendClientMessage(conn, "Can't create object(item)");
-			return;
-		}
-
-		char tmplog[2048];
-		BASE_GetItemCode(SrcItem, tmplog);
-		sprintf(temp, "dropitem, %s", tmplog);
-		//Log(temp, pUser[conn].AccountName, pUser[conn].IP);
-
-		memset(SrcItem, 0, sizeof(STRUCT_ITEM));
-
-		MSG_CNFDropItem sm_ditem;
-		memset(&sm_ditem, 0, sizeof(MSG_CNFDropItem));
-
-		sm_ditem.Type = _MSG_CNFDropItem;
-		sm_ditem.Size = sizeof(MSG_CNFDropItem);
-
-		sm_ditem.SourType = m->SourType;
-		sm_ditem.SourPos = m->SourPos;
-		sm_ditem.Rotate = m->Rotate;
-		sm_ditem.GridX = m->GridX;
-		sm_ditem.GridY = m->GridY;
-
-		pUser[conn].cSock.SendOneMessage((char*)&sm_ditem, sizeof(MSG_CNFDropItem));
-	}
-	else
+	// Validacao: itens especiais nao podem ser dropados
+	if (SrcItem->sIndex == 508 || SrcItem->sIndex == 509 || SrcItem->sIndex == 522 ||
+		(SrcItem->sIndex >= 526 && SrcItem->sIndex <= 537) ||
+		SrcItem->sIndex == 446 || SrcItem->sIndex == 747 ||
+		SrcItem->sIndex == 3993 || SrcItem->sIndex == 3994)
 	{
 		SendClientMessage(conn, g_pMessageStringTable[_NN_Guild_Medal_Cant_Be_Droped]);
 		return;
 	}
+
+	// PASSO 1: BACKUP COMPLETO do item (nao apenas ponteiro)
+	STRUCT_ITEM itemBackup;
+	memcpy(&itemBackup, SrcItem, sizeof(STRUCT_ITEM));
+
+	char tmplog[2048];
+	BASE_GetItemCode(&itemBackup, tmplog);
+	sprintf(temp, "dropitem, %s", tmplog);
+	SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
+
+	// PASSO 2: REMOVE do inventario PRIMEIRO (operacao atomica)
+	memset(SrcItem, 0, sizeof(STRUCT_ITEM));
+
+	// Envia atualizacao para o cliente imediatamente
+	SendItem(conn, m->SourType, m->SourPos, SrcItem);
+
+	// PASSO 3: Tenta criar item no chao
+	int drop = CreateItem(m->GridX, m->GridY, &itemBackup, m->Rotate, 1);
+
+	if (drop <= 0 || drop >= MAX_ITEM)
+	{
+		// PASSO 4: ROLLBACK - Falhou ao criar no chao, restaura no inventario
+		memcpy(SrcItem, &itemBackup, sizeof(STRUCT_ITEM));
+		SendItem(conn, m->SourType, m->SourPos, SrcItem);
+
+		sprintf(temp, "dropitem FAILED - rollback, item restored to inventory");
+		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
+
+		SendClientMessage(conn, "Can't create object(item)");
+		return;
+	}
+
+	// PASSO 5: SUCESSO - Confirma drop para o cliente
+	MSG_CNFDropItem sm_ditem;
+	memset(&sm_ditem, 0, sizeof(MSG_CNFDropItem));
+
+	sm_ditem.Type = _MSG_CNFDropItem;
+	sm_ditem.Size = sizeof(MSG_CNFDropItem);
+	sm_ditem.SourType = m->SourType;
+	sm_ditem.SourPos = m->SourPos;
+	sm_ditem.Rotate = m->Rotate;
+	sm_ditem.GridX = m->GridX;
+	sm_ditem.GridY = m->GridY;
+
+	pUser[conn].cSock.SendOneMessage((char*)&sm_ditem, sizeof(MSG_CNFDropItem));
+
+	//==============================================================================
+	// END FASE 1 - DropItem agora e atomico e seguro contra dupes
+	//==============================================================================
 }
