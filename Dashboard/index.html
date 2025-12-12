@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WYD Server Dashboard - Sistema de Monitoramento</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .last-update {
+            margin-top: 10px;
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+            padding-bottom: 10px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+
+        .metric-label {
+            font-size: 0.95em;
+            opacity: 0.9;
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+
+        .status-good { color: #4ade80; }
+        .status-warning { color: #fbbf24; }
+        .status-bad { color: #f87171; }
+
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        th {
+            background: rgba(255,255,255,0.2);
+            font-weight: bold;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .alert-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .alert-spike {
+            background: #dc2626;
+        }
+
+        .alert-increase {
+            background: #f59e0b;
+        }
+
+        .alert-decrease {
+            background: #3b82f6;
+        }
+
+        .tab-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab-button {
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s;
+        }
+
+        .tab-button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .tab-button.active {
+            background: rgba(255,255,255,0.4);
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #dc2626;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 WYD Server Dashboard</h1>
+            <div class="subtitle">Sistema de Monitoramento e Detecção de Dupes - Fase 3</div>
+            <div class="last-update" id="lastUpdate">Conectando ao servidor...</div>
+        </header>
+
+        <div class="tab-container">
+            <button class="tab-button active" onclick="showTab('metrics')">📊 Métricas Gerais</button>
+            <button class="tab-button" onclick="showTab('items')">💎 Itens Raros</button>
+            <button class="tab-button" onclick="showTab('alerts')">🚨 Alertas de Dupes</button>
+        </div>
+
+        <!-- Tab: Métricas Gerais -->
+        <div id="tab-metrics" class="tab-content active">
+            <div class="grid">
+                <!-- Saúde do Servidor -->
+                <div class="card">
+                    <h2>💚 Saúde do Servidor</h2>
+                    <div class="metric-row">
+                        <span class="metric-label">Players Online</span>
+                        <span class="metric-value status-good" id="activePlayers">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Mobs Ativos</span>
+                        <span class="metric-value" id="activeMobs">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Itens no Chão</span>
+                        <span class="metric-value" id="itemsGround">-</span>
+                    </div>
+                </div>
+
+                <!-- SaveUserSync -->
+                <div class="card">
+                    <h2>💾 SaveUserSync() - Fase 2</h2>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Saves</span>
+                        <span class="metric-value" id="totalSaves">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Taxa de Sucesso</span>
+                        <span class="metric-value status-good" id="saveSuccessRate">-</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="saveProgressBar" style="width: 0%">0%</div>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Tempo Médio</span>
+                        <span class="metric-value" id="avgSaveTime">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">⚠️ Timeouts</span>
+                        <span class="metric-value status-warning" id="saveTimeouts">-</span>
+                    </div>
+                </div>
+
+                <!-- Trades -->
+                <div class="card">
+                    <h2>🤝 Sistema de Trades</h2>
+                    <div class="metric-row">
+                        <span class="metric-label">Total de Trades</span>
+                        <span class="metric-value" id="totalTrades">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">✅ Bem-sucedidos</span>
+                        <span class="metric-value status-good" id="successTrades">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">❌ Falhas</span>
+                        <span class="metric-value status-bad" id="failedTrades">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">🔄 Rollbacks</span>
+                        <span class="metric-value status-warning" id="rollbackTrades">-</span>
+                    </div>
+                </div>
+
+                <!-- Operações de Itens -->
+                <div class="card">
+                    <h2>📦 Operações de Itens</h2>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Drops</span>
+                        <span class="metric-value" id="totalDrops">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Gets</span>
+                        <span class="metric-value" id="totalGets">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Total Splits</span>
+                        <span class="metric-value" id="totalSplits">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">⚠️ Drops Falhos</span>
+                        <span class="metric-value status-warning" id="failedDrops">-</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">⚠️ Gets Falhos</span>
+                        <span class="metric-value status-warning" id="failedGets">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab: Itens Raros -->
+        <div id="tab-items" class="tab-content">
+            <div class="card">
+                <h2>💎 Monitoramento de Itens Raros</h2>
+                <p style="opacity: 0.8; margin-bottom: 15px;">
+                    Rastreamento em tempo real de itens valiosos para detectar possíveis duplicações.
+                </p>
+                <table id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Inventário</th>
+                            <th>Cargo</th>
+                            <th>Equipado</th>
+                            <th>Chão</th>
+                            <th>Total</th>
+                            <th>Variação</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                        <tr>
+                            <td colspan="8" class="loading pulse">Carregando dados...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab: Alertas -->
+        <div id="tab-alerts" class="tab-content">
+            <div class="card">
+                <h2>🚨 Alertas de Possíveis Dupes</h2>
+                <p style="opacity: 0.8; margin-bottom: 15px;">
+                    Alertas automáticos quando detectado aumento súbito na quantidade de itens raros.
+                </p>
+                <div id="alertsContainer">
+                    <div class="loading pulse">Carregando alertas...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentTab = 'metrics';
+
+        function showTab(tabName) {
+            // Atualiza botões
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Atualiza conteúdo
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            currentTab = tabName;
+
+            // Carrega dados da tab
+            if (tabName === 'items') loadItems();
+            if (tabName === 'alerts') loadAlerts();
+        }
+
+        async function loadMetrics() {
+            try {
+                const response = await fetch(`${API_BASE}/metrics?t=${Date.now()}`);
+                const data = await response.json();
+
+                // Server Health
+                document.getElementById('activePlayers').textContent = data.server_health.active_players;
+                document.getElementById('activeMobs').textContent = data.server_health.active_mobs;
+                document.getElementById('itemsGround').textContent = data.server_health.items_on_ground;
+
+                // Saves
+                document.getElementById('totalSaves').textContent = data.saves.total;
+                const successRate = data.saves.success_rate.toFixed(2);
+                document.getElementById('saveSuccessRate').textContent = successRate + '%';
+                document.getElementById('saveProgressBar').style.width = successRate + '%';
+                document.getElementById('saveProgressBar').textContent = successRate + '%';
+                document.getElementById('avgSaveTime').textContent = data.saves.avg_time_ms.toFixed(2) + 'ms';
+                document.getElementById('saveTimeouts').textContent = data.saves.timeout;
+
+                // Trades
+                document.getElementById('totalTrades').textContent = data.trades.total;
+                document.getElementById('successTrades').textContent = data.trades.successful;
+                document.getElementById('failedTrades').textContent = data.trades.failed;
+                document.getElementById('rollbackTrades').textContent = data.trades.rollbacks;
+
+                // Items
+                document.getElementById('totalDrops').textContent = data.items.total_drops;
+                document.getElementById('totalGets').textContent = data.items.total_gets;
+                document.getElementById('totalSplits').textContent = data.items.total_splits || 0;
+                document.getElementById('failedDrops').textContent = data.items.failed_drops;
+                document.getElementById('failedGets').textContent = data.items.failed_gets;
+
+                document.getElementById('lastUpdate').textContent = 'Última atualização: ' + data.timestamp;
+            } catch (error) {
+                console.error('Erro ao carregar métricas:', error);
+                document.getElementById('lastUpdate').innerHTML =
+                    '<span class="status-bad">⚠️ Erro ao conectar ao servidor</span>';
+            }
+        }
+
+        async function loadItems() {
+            try {
+                const response = await fetch(`${API_BASE}/items?t=${Date.now()}`);
+                const data = await response.json();
+
+                const tbody = document.getElementById('itemsTableBody');
+                tbody.innerHTML = '';
+
+                if (data.items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 20px;">Nenhum item monitorado</td></tr>';
+                    return;
+                }
+
+                data.items.forEach(item => {
+                    const row = document.createElement('tr');
+
+                    let deltaHTML = '';
+                    if (item.delta > 0) {
+                        deltaHTML = `<span class="status-bad">+${item.delta}</span>`;
+                    } else if (item.delta < 0) {
+                        deltaHTML = `<span class="status-good">${item.delta}</span>`;
+                    } else {
+                        deltaHTML = '<span>0</span>';
+                    }
+
+                    let statusHTML = '';
+                    if (item.alert) {
+                        statusHTML = '<span class="alert-badge alert-spike">🚨 ALERTA</span>';
+                    } else {
+                        statusHTML = '<span class="status-good">✓ Normal</span>';
+                    }
+
+                    row.innerHTML = `
+                        <td><strong>${item.name}</strong></td>
+                        <td>${item.inventory}</td>
+                        <td>${item.cargo}</td>
+                        <td>${item.equipped}</td>
+                        <td>${item.ground}</td>
+                        <td><strong>${item.total}</strong></td>
+                        <td>${deltaHTML}</td>
+                        <td>${statusHTML}</td>
+                    `;
+
+                    if (item.alert) {
+                        row.style.background = 'rgba(239, 68, 68, 0.2)';
+                    }
+
+                    tbody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar itens:', error);
+                document.getElementById('itemsTableBody').innerHTML =
+                    '<tr><td colspan="8" class="error">Erro ao carregar dados de itens</td></tr>';
+            }
+        }
+
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`${API_BASE}/alerts?t=${Date.now()}`);
+                const data = await response.json();
+
+                const container = document.getElementById('alertsContainer');
+                container.innerHTML = '';
+
+                if (data.alerts.length === 0) {
+                    container.innerHTML = '<div style="text-align: center; padding: 40px; opacity: 0.7;">✅ Nenhum alerta de dupe detectado</div>';
+                    return;
+                }
+
+                data.alerts.forEach(alert => {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'card';
+                    alertDiv.style.marginBottom = '15px';
+
+                    let badgeClass = 'alert-increase';
+                    if (alert.type === 'SPIKE') badgeClass = 'alert-spike';
+                    if (alert.type === 'DECREASE') badgeClass = 'alert-decrease';
+
+                    alertDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span class="alert-badge ${badgeClass}">${alert.type}</span>
+                                <strong style="margin-left: 10px; font-size: 1.1em;">${alert.item_name}</strong>
+                            </div>
+                            <div style="opacity: 0.8;">${alert.timestamp}</div>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 1.1em;">
+                            ${alert.message}
+                        </div>
+                        <div style="margin-top: 10px; opacity: 0.8; font-size: 0.9em;">
+                            Quantidade anterior: ${alert.old_count} → Nova quantidade: ${alert.new_count}
+                        </div>
+                    `;
+
+                    container.appendChild(alertDiv);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar alertas:', error);
+                document.getElementById('alertsContainer').innerHTML =
+                    '<div class="error">Erro ao carregar alertas</div>';
+            }
+        }
+
+        // Carrega métricas iniciais
+        loadMetrics();
+
+        // Atualiza métricas a cada 5 segundos
+        setInterval(() => {
+            if (currentTab === 'metrics') loadMetrics();
+            if (currentTab === 'items') loadItems();
+            if (currentTab === 'alerts') loadAlerts();
+        }, 5000);
+
+        // Carrega itens e alertas ao carregar página
+        setTimeout(loadItems, 1000);
+        setTimeout(loadAlerts, 1500);
+    </script>
+</body>
+</html>
