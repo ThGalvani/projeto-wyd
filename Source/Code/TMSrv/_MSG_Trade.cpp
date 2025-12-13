@@ -1,5 +1,6 @@
 
 #include "ProcessClientMessage.h"
+#include "ServerMetrics.h"  // FASE 3
 
 void Exec_MSG_Trade(int conn, char* pMsg)
 {
@@ -415,6 +416,10 @@ void Exec_MSG_Trade(int conn, char* pMsg)
 				if (!save1_success || !save2_success)
 				{
 					// FALHA NO SAVE: ROLLBACK COMPLETO
+					// FASE 3: Registra métrica de falha e rollback
+					ServerMetrics::g_Metrics.RecordTradeFailure();
+					ServerMetrics::g_Metrics.RecordTradeRollback();
+
 					snprintf(temp, sizeof(temp), "Trade SAVE FAILED - ROLLBACK: conn:%d save:%d, opp:%d save:%d",
 						conn, save1_success, OpponentID, save2_success);
 					SystemLog("TRADE-SYSTEM", "00:00:00:00:00:00", 0, temp);
@@ -439,6 +444,9 @@ void Exec_MSG_Trade(int conn, char* pMsg)
 				}
 
 				// SUCESSO: Save confirmado pelo DBSrv
+				// FASE 3: Registra métrica de sucesso
+				ServerMetrics::g_Metrics.RecordTradeSuccess();
+
 				snprintf(temp, sizeof(temp), "Trade SAVE CONFIRMED by DBSrv: [%s] and [%s]",
 					pUser[conn].AccountName, pUser[OpponentID].AccountName);
 				SystemLog("TRADE-SYSTEM", "00:00:00:00:00:00", 0, temp);

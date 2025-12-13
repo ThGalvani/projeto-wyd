@@ -1,0 +1,43 @@
+// FASE 3 + FASE 4 - Arquivo de Patch para Integração de Métricas
+// Adicione estas linhas nos respectivos arquivos:
+
+// ============================================================
+// _MSG_DropItem.cpp
+// ============================================================
+// NO TOPO (após #include "ProcessClientMessage.h"):
+#include "ServerMetrics.h"
+
+// APÓS CreateItem (linha ~177):
+int drop = CreateItem(m->GridX, m->GridY, &itemBackup, m->Rotate, 1);
+
+// ADICIONAR:
+ServerMetrics::g_Metrics.RecordDrop(drop > 0 && drop < MAX_ITEM);
+
+// ============================================================
+// _MSG_GetItem.cpp
+// ============================================================
+// NO TOPO:
+#include "ServerMetrics.h"
+
+// QUANDO GET FOR BEM-SUCEDIDO (após memcpy do item, linha ~350):
+memcpy(bItem, ditem, sizeof(STRUCT_ITEM));
+SendItem(conn, Vol, bPos, bItem);
+
+// ADICIONAR:
+ServerMetrics::g_Metrics.RecordGet(true);
+
+// QUANDO GET FALHAR (nos returns de erro):
+// ADICIONAR antes do return:
+ServerMetrics::g_Metrics.RecordGet(false);
+
+// ============================================================
+// _MSG_SplitItem.cpp
+// ============================================================
+// NO TOPO:
+#include "ServerMetrics.h"
+
+// APÓS split bem-sucedido (linha ~168):
+SendCarry(conn);
+
+// ADICIONAR:
+ServerMetrics::g_Metrics.RecordSplit();

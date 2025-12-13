@@ -24,9 +24,14 @@
 #include "CColiseu.h"
 #include "CCubo.h"
 #include "IPControl.h"
-#include <vector> 
+#include <vector>
 #include "wMySQL.h"
 #include "Functions.h"
+
+// FASE 3 - Sistema de Métricas e Monitoramento
+#include "ServerMetrics.h"
+#include "ItemMonitor.h"
+#include "MetricsHTTP.h"
 
 #pragma region Defines
 
@@ -492,14 +497,23 @@ bool SaveUserSync(int conn, int timeout_ms)
 	if (confirmed && pending.success)
 	{
 		// Sucesso - confirmacao recebida
-		sprintf_s(temp, "SaveUserSync SUCCESS for conn:%d account:%s",
-			conn, pUser[conn].AccountName);
+		auto end = std::chrono::steady_clock::now();
+		double elapsed_ms = std::chrono::duration<double, std::milli>(end - pending.timestamp).count();
+
+		// FASE 3: Registra métrica de sucesso
+		ServerMetrics::g_Metrics.RecordSaveSuccess(elapsed_ms);
+
+		sprintf_s(temp, "SaveUserSync SUCCESS for conn:%d account:%s (time:%.2fms)",
+			conn, pUser[conn].AccountName, elapsed_ms);
 		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
 		success = true;
 	}
 	else if (!confirmed)
 	{
 		// Timeout - DBSrv nao respondeu
+		// FASE 3: Registra métrica de timeout
+		ServerMetrics::g_Metrics.RecordSaveTimeout();
+
 		sprintf_s(temp, "SaveUserSync TIMEOUT for conn:%d account:%s (timeout:%dms)",
 			conn, pUser[conn].AccountName, timeout_ms);
 		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
@@ -507,6 +521,9 @@ bool SaveUserSync(int conn, int timeout_ms)
 	else
 	{
 		// Confirmacao recebida mas save falhou
+		// FASE 3: Registra métrica de falha
+		ServerMetrics::g_Metrics.RecordSaveFailure();
+
 		sprintf_s(temp, "SaveUserSync FAILED for conn:%d account:%s",
 			conn, pUser[conn].AccountName);
 		SystemLog(pUser[conn].AccountName, pUser[conn].MacAddress, pUser[conn].IP, temp);
