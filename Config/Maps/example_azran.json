@@ -1,0 +1,216 @@
+{
+  "regions": [
+    {
+      "id": 1,
+      "name": "azran_kingdom",
+      "displayName": "Reino de Azran",
+      "description": "Capital do reino humano, local de com�rcio e tr einamento",
+      "type": "CITY",
+      "recommendedLevel": 1,
+      "backgroundMusic": "azran_theme.mp3",
+      "weatherEffect": "sunny",
+      "bounds": {
+        "minX": 1788,
+        "minY": 1538,
+        "maxX": 2185,
+        "maxY": 1785
+      },
+      "properties": {
+        "isPvPEnabled": false,
+        "isRespawnEnabled": true,
+        "isSafeZone": true,
+        "canTeleportIn": true,
+        "canTeleportOut": true,
+        "canTrade": true,
+        "canMount": true,
+        "minLevel": 1,
+        "maxLevel": 400,
+        "expBonus": 1.0,
+        "dropBonus": 1.0
+      },
+      "spawns": [],
+      "teleports": [
+        {
+          "name": "Portal para Erion",
+          "x": 1900,
+          "y": 1650,
+          "targetRegionId": 2,
+          "targetX": 2500,
+          "targetY": 2000,
+          "requiredLevel": 1,
+          "requiredGold": 0,
+          "requiredItem": ""
+        },
+        {
+          "name": "Portal para Armia",
+          "x": 1950,
+          "y": 1650,
+          "targetRegionId": 3,
+          "targetX": 2400,
+          "targetY": 2100,
+          "requiredLevel": 1,
+          "requiredGold": 0,
+          "requiredItem": ""
+        }
+      ],
+      "npcs": [
+        {
+          "name": "Mercador de Azran",
+          "npcId": 1001,
+          "x": 1920,
+          "y": 1660,
+          "type": "merchant",
+          "dialogue": "Bem-vindo � minha loja!"
+        },
+        {
+          "name": "Mestre de Quests",
+          "npcId": 1002,
+          "x": 1940,
+          "y": 1660,
+          "type": "quest",
+          "dialogue": "Tenho uma miss�o para voc�!"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "azran_garden",
+      "displayName": "Jardim de Azran",
+      "description": "�rea de ca�a para iniciantes",
+      "type": "FIELD",
+      "recommendedLevel": 10,
+      "backgroundMusic": "field_theme.mp3",
+      "weatherEffect": "clear",
+      "bounds": {
+        "minX": 2180,
+        "minY": 1533,
+        "maxX": 2435,
+        "maxY": 1787
+      },
+      "properties": {
+        "isPvPEnabled": false,
+        "isRespawnEnabled": true,
+        "isSafeZone": false,
+        "canTeleportIn": true,
+        "canTeleportOut": true,
+        "canTrade": true,
+        "canMount": true,
+        "minLevel": 1,
+        "maxLevel": 50,
+        "expBonus": 1.0,
+        "dropBonus": 1.0
+      },
+      "spawns": [
+        {
+          "x": 2250,
+          "y": 1600,
+          "radius": 20,
+          "mobName": "Orc_Shaman",
+          "minGroup": 2,
+          "maxGroup": 4,
+          "minuteRespawn": 5
+        },
+        {
+          "x": 2300,
+          "y": 1650,
+          "radius": 15,
+          "mobName": "Ciclope_Sangr",
+          "minGroup": 1,
+          "maxGroup": 2,
+          "minuteRespawn": 10
+        }
+      ],
+      "teleports": [],
+      "npcs": []
+    },
+    {
+      "id": 10,
+      "name": "dungeon_hydra",
+      "displayName": "Caverna da Hidra",
+      "description": "Dungeon perigosa nivel 100+",
+      "type": "DUNGEON",
+      "recommendedLevel": 100,
+      "backgroundMusic": "dungeon_dark.mp3",
+      "weatherEffect": "fog",
+      "bounds": {
+        "minX": 127,
+        "minY": 3710,
+        "maxX": 767,
+        "maxY": 6841
+      },
+      "properties": {
+        "isPvPEnabled": true,
+        "isRespawnEnabled": true,
+        "isSafeZone": false,
+        "canTeleportIn": true,
+        "canTeleportOut": false,
+        "canTrade": false,
+        "canMount": false,
+        "minLevel": 80,
+        "maxLevel": 400,
+        "expBonus": 2.0,
+        "dropBonus": 1.5
+      },
+      "spawns": [
+        {
+          "x": 400,
+          "y": 4000,
+          "radius": 30,
+          "mobName": "Troll_Zumbi",
+          "minGroup": 3,
+          "maxGroup": 6,
+          "minuteRespawn": 3
+        },
+        {
+          "x": 500,
+          "y": 5000,
+          "radius": 50,
+          "mobName": "Hydra_Boss",
+          "minGroup": 1,
+          "maxGroup": 1,
+          "minuteRespawn": 60
+        }
+      ],
+      "teleports": [
+        {
+          "name": "Saida de Emergencia",
+          "x": 150,
+          "y": 3720,
+          "targetRegionId": 1,
+          "targetX": 1900,
+          "targetY": 1650,
+          "requiredLevel": 1,
+          "requiredGold": 5000,
+          "requiredItem": ""
+        }
+      ],
+      "npcs": []
+    }
+  ],
+  "spawnTemplates": [
+    {
+      "templateName": "weak_mob_spawn",
+      "mobName": "Orc",
+      "minGroup": 2,
+      "maxGroup": 4,
+      "minuteRespawn": 3,
+      "defaultRadius": 15
+    },
+    {
+      "templateName": "medium_mob_spawn",
+      "mobName": "Ciclope",
+      "minGroup": 1,
+      "maxGroup": 3,
+      "minuteRespawn": 5,
+      "defaultRadius": 20
+    },
+    {
+      "templateName": "boss_spawn",
+      "mobName": "Boss_Generic",
+      "minGroup": 1,
+      "maxGroup": 1,
+      "minuteRespawn": 60,
+      "defaultRadius": 50
+    }
+  ]
+}
