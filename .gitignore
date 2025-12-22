@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+**/.env
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Temporary
+*.tmp
+tmp/
+temp/
+
+# Prisma
+*.db
+*.db-journal
+
+# Frontend specific
+frontend/.cache/
+frontend/dist/
+
+# Backend specific
+backend/dist/
+backend/uploads/
+
+# Old project files (game server)
+Cliente/
+Server/
+Source/
+mysql-connector-c-6.1.11-winx64.msi
+README.md

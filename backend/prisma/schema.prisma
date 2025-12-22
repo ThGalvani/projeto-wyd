@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password      String
+  profileImage  String?
+  partnerId     String?  @unique
+  partner       User?    @relation("Partners", fields: [partnerId], references: [id], onDelete: SetNull)
+  partnerOf     User?    @relation("Partners")
+
+  transactions  Transaction[]
+  goals         Goal[]
+  subscriptions Subscription[]
+  notifications Notification[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Category {
+  id              String   @id @default(uuid())
+  name            String
+  icon            String
+  color           String
+  type            String   // expense, income
+  subcategories   String[] // JSON array
+  monthlyBudget   Float?
+  isDefault       Boolean  @default(false)
+
+  transactions    Transaction[]
+  subscriptions   Subscription[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("categories")
+}
+
+model Transaction {
+  id                String   @id @default(uuid())
+  type              String   // expense, income
+  categoryId        String
+  category          Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  subcategory       String?
+  amount            Float
+  description       String
+  date              DateTime
+
+  isRecurring       Boolean  @default(false)
+  recurringFreq     String?  // daily, weekly, monthly, yearly
+  recurringInterval Int?
+  nextOccurrence    DateTime?
+
+  splitType         String   // shared, individual
+  splitPercentUser1 Int?
+  splitPercentUser2 Int?
+  paidById          String
+  paidBy            User     @relation(fields: [paidById], references: [id], onDelete: Cascade)
+
+  attachments       String[] // URLs
+  tags              String[]
+  notes             String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("transactions")
+  @@index([categoryId])
+  @@index([paidById])
+  @@index([date])
+  @@index([type])
+}
+
+model Subscription {
+  id              String   @id @default(uuid())
+  name            String
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  amount          Float
+  frequency       String   // monthly, quarterly, semiannual, yearly
+  billingDate     Int      // 1-31
+  nextBillingDate DateTime
+
+  splitType       String
+  splitPercent1   Int?
+  splitPercent2   Int?
+  paidById        String
+  paidBy          User     @relation(fields: [paidById], references: [id], onDelete: Cascade)
+
+  isActive        Boolean  @default(true)
+  notifyBefore    Int      @default(3)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("subscriptions")
+  @@index([paidById])
+  @@index([nextBillingDate])
+}
+
+model Goal {
+  id                  String   @id @default(uuid())
+  title               String
+  description         String?
+  targetAmount        Float
+  currentAmount       Float    @default(0)
+  deadline            DateTime
+  category            String
+  icon                String
+  color               String
+  image               String?
+
+  isShared            Boolean  @default(true)
+  monthlyContribution Float?
+
+  progress            Int      @default(0)
+
+  userId              String
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("goals")
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // bill, budget, goal, subscription
+  priority  String   // low, medium, high
+  title     String
+  message   String
+  icon      String
+  isRead    Boolean  @default(false)
+  actionUrl String?
+
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([isRead])
+}
