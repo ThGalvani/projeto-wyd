@@ -15,6 +15,13 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Check if running in demo mode (no database)
+const DEMO_MODE = process.env.DEMO_MODE === 'true' || !process.env.DATABASE_URL
+
+if (DEMO_MODE) {
+  console.log('⚠️  Running in DEMO MODE - No database connected')
+}
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -25,7 +32,22 @@ app.use(express.urlencoded({ extended: true }))
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    mode: DEMO_MODE ? 'demo' : 'production',
+    database: DEMO_MODE ? 'mock' : 'connected'
+  })
+})
+
+// Demo mode indicator
+app.get('/api/status', (req, res) => {
+  res.json({
+    demoMode: DEMO_MODE,
+    message: DEMO_MODE
+      ? 'Running in demo mode with mock data. Configure DATABASE_URL to use real database.'
+      : 'Connected to database',
+  })
 })
 
 // Routes
@@ -51,7 +73,17 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' })
 })
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
-})
+// For Vercel serverless
+if (process.env.VERCEL) {
+  module.exports = app
+} else {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`)
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
+    if (DEMO_MODE) {
+      console.log(`⚠️  Demo Mode: Using mock data`)
+    }
+  })
+}
+
+export default app
