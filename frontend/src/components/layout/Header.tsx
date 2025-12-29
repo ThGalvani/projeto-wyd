@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import { Menu, Bell, LogOut, User, Sun, Moon } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 
 interface HeaderProps {
   onMenuClick: () => void
