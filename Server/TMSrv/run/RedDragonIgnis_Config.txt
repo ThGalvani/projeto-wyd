@@ -1,0 +1,131 @@
+####################################
+# RedDragon Ignis - Boss Configuration
+# Level 450 World Boss
+# Spawn: Every 6 hours (04:00, 10:00, 16:00, 22:00 GMT-3)
+####################################
+
+[MOB_STATS]
+MobID=9500
+Name=RedDragon_Ignis
+Level=450
+HP=500000000
+MP=100000
+Damage=5000-8000
+Defense=800
+MagicDefense=600
+AttackSpeed=120
+MoveSpeed=180
+Range=8
+AIType=BOSS_AGGRESSIVE
+RespawnTime=21600  # 6 hours in seconds
+
+[ABILITIES]
+# Phase 1 (100%-70% HP)
+Skill1=DragonBreath     # Cone 8m, 50k fire damage, 15s cooldown
+Skill2=TailSweep        # AoE 5m, 30k damage + knockback, 20s cooldown
+Skill3=FlamePool        # Leaves fire pools, 5k/sec damage, 25s cooldown
+
+# Phase 2 (70%-40% HP)
+Skill4=HardenedScales   # +50% Defense buff
+Skill5=MeteorShower     # Random AoE on 5 players, 40k each, 30s cooldown
+Skill6=WingGust         # Pushback all players, 35s cooldown
+Skill7=Enrage           # If scales not broken in 3min, wipe
+
+# Phase 3 (40%-0% HP)
+Skill8=InfernalNova     # Global AoE, 60k damage, requires shield, 45s cooldown
+Skill9=SummonDragonlings # 3 adds with 5M HP each, once per phase
+Skill10=Berserk         # At 8min combat, +500% damage
+
+[DROP_TABLE]
+# 100% Guaranteed
+Item1=5753,1,3,100        # RedDragon Scale, 1-3x, 100%
+Item2=2000,1000000000,1000000000,100  # 1B Gold, 100%
+
+# High Chance
+Item3=5752,1,1,80         # Dragon Soul, 1x, 80%
+Item4=5754,1,2,60         # Infernal Flame, 1-2x, 60%
+Item5=1760,1,1,35         # Pedra da Imortalidade (reusing existing ID), 35%
+
+# Essences (30% each)
+Item6=5757,1,1,30         # Essencia do Fogo, 30%
+Item7=5758,1,1,30         # Essencia do Gelo, 30%
+Item8=5759,1,1,30         # Essencia do Trovão, 30%
+Item9=5760,1,1,30         # Essencia da Terra, 30%
+Item10=5761,1,1,30        # Essencia do Vento, 30%
+
+# Medium Chance
+Item11=420,5,10,50        # Safira (reusing existing ID), 5-10x, 50%
+
+# Low Chance Boxes
+Item12=5780,1,1,20        # RedDragon Armor Box (New), 20%
+Item13=5781,1,1,15        # RedDragon Weapon Box (New), 15%
+
+# Very Rare
+Item14=5755,1,1,5         # Dragon Heart, 5%
+
+[SPAWN_LOCATIONS]
+# Vulcão Carmesim coordinates (adjust based on map)
+# Or reuse existing map coordinates
+Location1=2285,1650  # Main spawn point
+Location2=2290,1655  # Alternate 1
+Location3=2280,1645  # Alternate 2
+
+[MECHANICS_CONFIG]
+PhaseTransition_70HP=HardenedScales
+PhaseTransition_40HP=RemoveBuff,IncreaseAttackSpeed
+EnrageTimer=480  # 8 minutes in seconds
+ScalesBreakMechanic=RequireDamageThreshold_50M  # Players must deal 50M damage to break scales in Phase 2
+
+[REWARDS_MULTIPLIER]
+# Bonus rewards for guild that deals killing blow
+GuildBonus_Scale=2  # 2x more scales
+GuildBonus_Fame=500  # +500 fame points
+FirstKillBonus=5782  # Special title item ID (New)
+
+####################################
+# Drop Box Items Configuration
+####################################
+
+[ARMOR_BOX_5780]
+# RedDragon Armor Box - Opens to random armor piece
+Contains1=5764,20  # Elmo RedDragon, 20%
+Contains2=5765,20  # Armadura RedDragon, 20%
+Contains3=5766,20  # Calça RedDragon, 20%
+Contains4=5767,20  # Manoplas RedDragon, 20%
+Contains5=5768,20  # Botas RedDragon, 20%
+
+[WEAPON_BOX_5781]
+# RedDragon Weapon Box - Opens to random weapon
+Contains1=5762,50  # Garra RedDragon, 50%
+Contains2=5763,50  # Cajado RedDragon, 50%
+
+####################################
+# NPC Configuration
+####################################
+
+[NPC_DRAGONFORGE_MASTER]
+NPCID=9600
+Name=Mestre_da_Forja_Draconica
+Location=Armia_Bank  # Near bank
+Function=DragonInfusion
+RequiredLevel=380
+CombineFunction=Exec_MSG_CombineItemDragonForge
+
+####################################
+# Server Messages
+####################################
+
+[BROADCAST_MESSAGES]
+SpawnMessage=O temível RedDragon Ignis surgiu! Prepare-se para a batalha!
+DeathMessage=RedDragon Ignis foi derrotado! Próximo respawn em 6 horas.
+PhaseTransitionMessage=RedDragon Ignis entrou em uma nova fase de fúria!
+EnrageWarning=RedDragon Ignis está enfurecido! Cuidado!
+
+####################################
+# Balance Notes
+####################################
+# Boss designed for 10-15 Celestial 380+ players
+# Average kill time: 15-25 minutes
+# Requires coordinated healing, tanking, and DPS
+# Mechanics punish unorganized groups
+# Rewards scale with performance (damage dealt tracking)
